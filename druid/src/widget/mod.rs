@@ -65,7 +65,10 @@ pub use widget_ext::WidgetExt;
 use std::ops::{Deref, DerefMut};
 
 use crate::kurbo::Size;
-use crate::{BoxConstraints, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, WidgetId};
+use crate::{
+    BoxConstraints, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx, UpdateCtx,
+    WidgetId,
+};
 
 /// The trait implemented by all widgets.
 ///
@@ -118,6 +121,9 @@ pub trait Widget<T> {
     /// [`Command`]: struct.Command.html
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env);
 
+    #[allow(unused_variables)]
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env);
+
     /// Handle a change of data.
     ///
     /// This method is called whenever the data changes. When the appearance of
@@ -130,9 +136,6 @@ pub trait Widget<T> {
     /// used to build resources that will be retained for painting.
     ///
     /// [`invalidate`]: struct.UpdateCtx.html#method.invalidate
-
-    // Consider a no-op default impl. One reason against is that containers might
-    // inadvertently forget to propagate.
     fn update(&mut self, ctx: &mut UpdateCtx, old_data: Option<&T>, data: &T, env: &Env);
 
     /// Compute layout.
@@ -186,6 +189,10 @@ impl<T> Widget<T> for Box<dyn Widget<T>> {
 
     fn update(&mut self, ctx: &mut UpdateCtx, old_data: Option<&T>, data: &T, env: &Env) {
         self.deref_mut().update(ctx, old_data, data, env);
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
+        self.deref_mut().lifecycle(ctx, event, data, env);
     }
 
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {

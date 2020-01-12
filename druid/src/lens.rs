@@ -21,7 +21,10 @@ use std::sync::Arc;
 pub use druid_derive::Lens;
 
 use crate::kurbo::Size;
-use crate::{BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget};
+use crate::{
+    BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx,
+    UpdateCtx, Widget,
+};
 
 /// A lens is a datatype that gives access to a part of a larger
 /// data structure.
@@ -238,6 +241,12 @@ where
         } else {
             lens.with(data, |data| inner.update(ctx, None, data, env));
         }
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
+        let inner = &mut self.inner;
+        self.lens
+            .with(data, |data| inner.lifecycle(ctx, event, data, env))
     }
 
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {

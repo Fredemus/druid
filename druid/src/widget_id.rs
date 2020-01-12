@@ -16,7 +16,10 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::kurbo::Size;
 
-use crate::{BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget};
+use crate::{
+    BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx,
+    UpdateCtx, Widget,
+};
 
 /// A unique identifier for a single widget.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -56,6 +59,11 @@ impl<T: Data, W: Widget<T>> Widget<T> for IdentityWrapper<W> {
     fn update(&mut self, ctx: &mut UpdateCtx, old_data: Option<&T>, data: &T, env: &Env) {
         self.inner.update(ctx, old_data, data, env);
     }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
+        self.inner.lifecycle(ctx, event, data, env)
+    }
+
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
         self.inner.layout(ctx, bc, data, env)
     }
