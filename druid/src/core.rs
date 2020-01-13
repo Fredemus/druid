@@ -375,12 +375,8 @@ impl<T: Data, W: Widget<T>> WidgetPod<T, W> {
     }
 
     pub fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
-        let had_request_timer = ctx.request_timer;
-        ctx.request_timer = false;
         ctx.widget_id = self.id();
         self.inner.lifecycle(ctx, event, data, env);
-        self.state.request_timer |= ctx.request_timer;
-        ctx.request_timer |= had_request_timer;
     }
 
     /// Propagate a data update.
@@ -578,7 +574,6 @@ pub struct EventCtx<'a, 'b> {
 
 pub struct LifeCycleCtx<'a> {
     pub(crate) command_queue: &'a mut VecDeque<(Target, Command)>,
-    pub(crate) request_timer: bool,
     pub(crate) window_id: WindowId,
     pub(crate) widget_id: WidgetId,
 }
@@ -592,6 +587,7 @@ pub struct LifeCycleCtx<'a> {
 pub struct UpdateCtx<'a, 'b: 'a> {
     pub(crate) text_factory: &'a mut Text<'b>,
     pub(crate) window: &'a WindowHandle,
+    pub(crate) command_queue: &'a mut VecDeque<(Target, Command)>,
     // Discussion: we probably want to propagate more fine-grained
     // invalidations, which would mean a structure very much like
     // `EventCtx` (and possibly using the same structure).But for
@@ -780,6 +776,14 @@ impl<'a, 'b> EventCtx<'a, 'b> {
     pub fn widget_id(&self) -> WidgetId {
         self.widget_id
     }
+
+    pub fn make_lifecycle_ctx(&mut self) -> LifeCycleCtx {
+        LifeCycleCtx {
+            command_queue: self.command_queue,
+            window_id: self.window_id,
+            widget_id: self.widget_id,
+        }
+    }
 }
 
 impl<'a> LifeCycleCtx<'a> {
@@ -850,5 +854,13 @@ impl<'a, 'b> UpdateCtx<'a, 'b> {
     /// get the `WidgetId` of the current widget.
     pub fn widget_id(&self) -> WidgetId {
         self.widget_id
+    }
+
+    pub fn make_lifecycle_ctx(&mut self) -> LifeCycleCtx {
+        LifeCycleCtx {
+            command_queue: self.command_queue,
+            window_id: self.window_id,
+            widget_id: self.widget_id,
+        }
     }
 }

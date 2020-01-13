@@ -40,14 +40,15 @@ impl<T: Data> List<T> {
     }
 
     /// When the widget is created or the data changes, create or remove children as needed
-    fn update_child_count(&mut self, data: &impl ListIter<T>) {
+    fn update_child_count(&mut self, ctx: &mut LifeCycleCtx, data: &impl ListIter<T>, env: &Env) {
         let len = self.children.len();
         if len > data.data_len() {
             self.children.truncate(data.data_len())
         } else if len < data.data_len() {
-            data.for_each(|_, i| {
+            data.for_each(|child_data, i| {
                 if i >= len {
-                    let child = WidgetPod::new((self.closure)());
+                    let mut child = WidgetPod::new((self.closure)());
+                    child.lifecycle(ctx, &LifeCycle::WidgetAdded, child_data, env);
                     self.children.push(child);
                 }
             });
@@ -149,7 +150,8 @@ impl<C: Data, T: ListIter<C>> Widget<T> for List<C> {
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, _old_data: Option<&T>, data: &T, env: &Env) {
-        self.update_child_count(data);
+        let mut life_ctx = ctx.make_lifecycle_ctx();
+        self.update_child_count(&mut life_ctx, data, env);
         let mut children = self.children.iter_mut();
         data.for_each(|child_data, _| {
             if let Some(child) = children.next() {
@@ -160,7 +162,7 @@ impl<C: Data, T: ListIter<C>> Widget<T> for List<C> {
 
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
         if let LifeCycle::WidgetAdded = event {
-            self.update_child_count(data);
+            self.update_child_count(ctx, data, env);
         }
 
         let mut children = self.children.iter_mut();
