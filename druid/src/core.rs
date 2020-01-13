@@ -335,11 +335,6 @@ impl<T: Data, W: Widget<T>> WidgetPod<T, W> {
                 recurse = focus || had_focus;
                 Event::FocusChanged(focus)
             }
-            Event::AnimFrame(interval) => {
-                recurse = child_ctx.base_state.request_anim;
-                child_ctx.base_state.request_anim = false;
-                Event::AnimFrame(*interval)
-            }
             Event::Timer(id) => {
                 recurse = child_ctx.base_state.request_timer;
                 Event::Timer(*id)
@@ -376,7 +371,21 @@ impl<T: Data, W: Widget<T>> WidgetPod<T, W> {
 
     pub fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
         ctx.widget_id = self.id();
-        self.inner.lifecycle(ctx, event, data, env);
+        let had_request_anim = ctx.request_anim;
+        let recurse = match event {
+            LifeCycle::AnimFrame(_) => {
+                let r = self.state.request_anim;
+                self.state.request_anim = false;
+                ctx.request_anim = false;
+                r
+            }
+            _ => true,
+        };
+        if recurse {
+            self.inner.lifecycle(ctx, event, data, env);
+            self.state.request_anim = ctx.request_anim;
+            ctx.request_anim |= had_request_anim;
+        }
     }
 
     /// Propagate a data update.
@@ -574,6 +583,7 @@ pub struct EventCtx<'a, 'b> {
 
 pub struct LifeCycleCtx<'a> {
     pub(crate) command_queue: &'a mut VecDeque<(Target, Command)>,
+    pub(crate) request_anim: bool,
     pub(crate) window_id: WindowId,
     pub(crate) widget_id: WidgetId,
 }
@@ -780,6 +790,7 @@ impl<'a, 'b> EventCtx<'a, 'b> {
     pub fn make_lifecycle_ctx(&mut self) -> LifeCycleCtx {
         LifeCycleCtx {
             command_queue: self.command_queue,
+            request_anim: false,
             window_id: self.window_id,
             widget_id: self.widget_id,
         }
@@ -790,6 +801,11 @@ impl<'a> LifeCycleCtx<'a> {
     /// Returns the current widget's `WidgetId`.
     pub fn widget_id(&self) -> WidgetId {
         self.widget_id
+    }
+
+    /// Request an animation frame.
+    pub fn request_anim_frame(&mut self) {
+        self.request_anim = true;
     }
 
     /// Submit a [`Command`] to be run after this event is handled.
@@ -859,6 +875,7 @@ impl<'a, 'b> UpdateCtx<'a, 'b> {
     pub fn make_lifecycle_ctx(&mut self) -> LifeCycleCtx {
         LifeCycleCtx {
             command_queue: self.command_queue,
+            request_anim: false,
             window_id: self.window_id,
             widget_id: self.widget_id,
         }

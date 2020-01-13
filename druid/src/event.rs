@@ -105,12 +105,6 @@ pub enum Event {
     /// See [`has_focus`](struct.BaseState.html#method.has_focus) for
     /// discussion about the focus status.
     FocusChanged(bool),
-    /// Called at the beginning of a new animation frame.
-    ///
-    /// On the first frame when transitioning from idle to animating, `interval`
-    /// will be 0. (This logic is presently per-window but might change to
-    /// per-widget to make it more consistent). Otherwise it is in nanoseconds.
-    AnimFrame(u64),
     /// Called on a timer event.
     ///
     /// Request a timer event through [`EventCtx::request_timer()`]. That will
@@ -153,6 +147,12 @@ pub enum LifeCycle {
     /// This is sent after `WidgetAdded`. Widgets should handle this event if
     /// they need to do some addition setup when a window is first created.
     WindowConnected,
+    /// Called at the beginning of a new animation frame.
+    ///
+    /// On the first frame when transitioning from idle to animating, `interval`
+    /// will be 0. (This logic is presently per-window but might change to
+    /// per-widget to make it more consistent). Otherwise it is in nanoseconds.
+    AnimFrame(u64),
 }
 
 /// A mouse wheel event.
