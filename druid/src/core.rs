@@ -377,6 +377,7 @@ impl<T: Data, W: Widget<T>> WidgetPod<T, W> {
     pub fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
         let had_request_timer = ctx.request_timer;
         ctx.request_timer = false;
+        ctx.widget_id = self.id();
         self.inner.lifecycle(ctx, event, data, env);
         self.state.request_timer |= ctx.request_timer;
         ctx.request_timer |= had_request_timer;
@@ -575,9 +576,8 @@ pub struct EventCtx<'a, 'b> {
     pub(crate) widget_id: WidgetId,
 }
 
-pub struct LifeCycleCtx<'a, 'b: 'a> {
+pub struct LifeCycleCtx<'a> {
     pub(crate) command_queue: &'a mut VecDeque<(Target, Command)>,
-    pub(crate) win_ctx: &'a mut dyn WinCtx<'b>,
     pub(crate) request_timer: bool,
     pub(crate) window_id: WindowId,
     pub(crate) widget_id: WidgetId,
@@ -782,19 +782,10 @@ impl<'a, 'b> EventCtx<'a, 'b> {
     }
 }
 
-impl<'a, 'b> LifeCycleCtx<'a, 'b> {
+impl<'a> LifeCycleCtx<'a> {
     /// Returns the current widget's `WidgetId`.
     pub fn widget_id(&self) -> WidgetId {
         self.widget_id
-    }
-
-    /// Request a timer event.
-    ///
-    /// The return value is a token, which can be used to associate the
-    /// request with the event.
-    pub fn request_timer(&mut self, deadline: Instant) -> TimerToken {
-        self.request_timer = true;
-        self.win_ctx.request_timer(deadline)
     }
 
     /// Submit a [`Command`] to be run after this event is handled.
