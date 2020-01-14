@@ -236,6 +236,7 @@ impl<'a, T: Data> SingleWindowState<'a, T> {
         let mut ctx = LifeCycleCtx {
             command_queue: self.command_queue,
             request_anim: false,
+            needs_inval: false,
             window_id: self.window_id,
             widget_id: self.window.root.id(),
         };

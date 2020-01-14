@@ -249,7 +249,7 @@ impl<T: Data, W: Widget<T>> WidgetPod<T, W> {
     /// [`event`]: trait.Widget.html#method.event
     pub fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
         // TODO: factor as much logic as possible into monomorphic functions.
-        if ctx.is_handled || !event.recurse() {
+        if ctx.is_handled {
             // This function is called by containers to propagate an event from
             // containers to children. Non-recurse events will be invoked directly
             // from other points in the library.
@@ -326,7 +326,6 @@ impl<T: Data, W: Widget<T>> WidgetPod<T, W> {
                 recurse = had_active || child_ctx.base_state.is_hot;
                 Event::Zoom(*zoom)
             }
-            Event::HotChanged(is_hot) => Event::HotChanged(*is_hot),
             Event::FocusChanged(_is_focused) => {
                 let had_focus = child_ctx.base_state.has_focus;
                 let focus = child_ctx.base_state.request_focus;
@@ -351,9 +350,11 @@ impl<T: Data, W: Widget<T>> WidgetPod<T, W> {
         };
         child_ctx.base_state.needs_inval = false;
         if let Some(is_hot) = hot_changed {
-            let hot_changed_event = Event::HotChanged(is_hot);
+            let hot_changed_event = LifeCycle::HotChanged(is_hot);
+            let mut lc_ctx = child_ctx.make_lifecycle_ctx();
             self.inner
-                .event(&mut child_ctx, &hot_changed_event, data, &env);
+                .lifecycle(&mut lc_ctx, &hot_changed_event, data, &env);
+            ctx.base_state.needs_inval |= lc_ctx.needs_inval;
         }
         if recurse {
             child_ctx.base_state.has_active = false;
@@ -372,6 +373,7 @@ impl<T: Data, W: Widget<T>> WidgetPod<T, W> {
     pub fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
         ctx.widget_id = self.id();
         let had_request_anim = ctx.request_anim;
+        ctx.needs_inval = false;
         let recurse = match event {
             LifeCycle::AnimFrame(_) => {
                 let r = self.state.request_anim;
@@ -379,11 +381,13 @@ impl<T: Data, W: Widget<T>> WidgetPod<T, W> {
                 ctx.request_anim = false;
                 r
             }
+            LifeCycle::HotChanged(_) => false,
             _ => true,
         };
         if recurse {
             self.inner.lifecycle(ctx, event, data, env);
             self.state.request_anim = ctx.request_anim;
+            self.state.needs_inval |= ctx.needs_inval;
             ctx.request_anim |= had_request_anim;
         }
     }
@@ -584,6 +588,7 @@ pub struct EventCtx<'a, 'b> {
 pub struct LifeCycleCtx<'a> {
     pub(crate) command_queue: &'a mut VecDeque<(Target, Command)>,
     pub(crate) request_anim: bool,
+    pub(crate) needs_inval: bool,
     pub(crate) window_id: WindowId,
     pub(crate) widget_id: WidgetId,
 }
@@ -790,9 +795,10 @@ impl<'a, 'b> EventCtx<'a, 'b> {
     pub fn make_lifecycle_ctx(&mut self) -> LifeCycleCtx {
         LifeCycleCtx {
             command_queue: self.command_queue,
-            request_anim: false,
             window_id: self.window_id,
             widget_id: self.widget_id,
+            request_anim: false,
+            needs_inval: false,
         }
     }
 }
@@ -806,6 +812,14 @@ impl<'a> LifeCycleCtx<'a> {
     /// Request an animation frame.
     pub fn request_anim_frame(&mut self) {
         self.request_anim = true;
+    }
+
+    /// Invalidate.
+    ///
+    /// See [`EventCtx::invalidate`](struct.EventCtx.html#method.invalidate) for
+    /// more discussion.
+    pub fn invalidate(&mut self) {
+        self.needs_inval = true;
     }
 
     /// Submit a [`Command`] to be run after this event is handled.
@@ -875,9 +889,10 @@ impl<'a, 'b> UpdateCtx<'a, 'b> {
     pub fn make_lifecycle_ctx(&mut self) -> LifeCycleCtx {
         LifeCycleCtx {
             command_queue: self.command_queue,
-            request_anim: false,
             window_id: self.window_id,
             widget_id: self.widget_id,
+            request_anim: false,
+            needs_inval: false,
         }
     }
 }
