@@ -907,10 +907,15 @@ impl WindowBuilder {
     
     // On Windows the parent_view is this instead:
     //In Windows, that parent pointer is really a winapi::HWND__. 
-    //You can convert the parent pointer by doing parent as *mut winapi::HWND__,
+    //You can convert the parent pointer by doing parent as *mut winapi::shared::windef::HWND__,
     // and connecting to the window through CreateWindowExW.
     ///
-    pub unsafe fn attach(self, parent_view: *mut winapi::shared::windef::HWND__) -> Result<WindowHandle, Error> {
+    pub unsafe fn attach(self, parent: *mut c_void) -> Result<WindowHandle, Error> {
+
+        // let parent_view = winapi::shared::windef::HWND::from(parent);
+        let parent_view = std::mem::transmute::<*mut c_void, winapi::shared::windef::HWND>(parent);
+        // let parentview = parent as winapi::shared::windef::HWND__;
+
         // Not sure if it's really a good idea to take stuff from build
         let dwrite_factory = directwrite::Factory::new().unwrap();
         /// Not sure why a clone is necessary

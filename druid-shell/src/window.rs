@@ -17,6 +17,7 @@
 #![allow(deprecated)] // for the three items that have moved
 
 use std::any::Any;
+use std::ffi::c_void;
 
 use crate::dialog::{FileDialogOptions, FileInfo};
 use crate::error::Error;
@@ -182,6 +183,14 @@ impl WindowBuilder {
     /// If this fails, your application should exit.
     pub fn build(self) -> Result<WindowHandle, Error> {
         self.0.build().map(WindowHandle).map_err(Into::into)
+    }
+    /// Attempt to attach a window to a parent window
+    /// 
+    /// If this fails, your application should exit.
+    pub fn attach(self, parent: *mut c_void) -> Result<WindowHandle, Error> {
+        unsafe {
+            self.0.attach(parent).map(WindowHandle).map_err(Into::into)
+        }
     }
 }
 

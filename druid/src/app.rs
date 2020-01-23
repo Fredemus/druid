@@ -17,12 +17,16 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::ffi::c_void;
 
 use crate::kurbo::Size;
 use crate::shell::{Application, Error as PlatformError, RunLoop, WindowBuilder, WindowHandle};
 use crate::win_handler::AppState;
 use crate::window::{Window, WindowId};
 use crate::{theme, AppDelegate, Data, DruidHandler, Env, LocalizedString, MenuDesc, Widget};
+
+
+
 
 /// A function that modifies the initial environment.
 type EnvSetupFn<T> = dyn FnOnce(&mut Env, &T);
@@ -110,6 +114,25 @@ impl<T: Data> AppLauncher<T> {
         main_loop.run();
         Ok(())
     }
+    /// Same as launch, but for attaching the window to a parent window
+    pub fn launch_vst(mut self, data: T, parent: *mut c_void) -> Result<(), PlatformError> {
+        Application::init();
+        let mut main_loop = RunLoop::new();
+        let mut env = theme::init();
+        if let Some(f) = self.env_setup.take() {
+            f(&mut env, &data);
+        }
+
+        let state = AppState::new(data, env, self.delegate.take());
+
+        for desc in self.windows {
+            let window = desc.attach_native(&state, parent)?;
+            window.show();
+        }
+
+        main_loop.run();
+        Ok(())
+    }
 }
 
 impl<T: Data> WindowDesc<T> {
@@ -190,7 +213,44 @@ impl<T: Data> WindowDesc<T> {
 
         builder.build()
     }
+    // TODO: figure out what the hell to have in here
+    pub(crate) fn attach_native(
+        &self,
+        state: &Rc<RefCell<AppState<T>>>,
+        parent: *mut c_void
+    ) -> Result<WindowHandle, PlatformError> {
+        let mut title = self
+            .title
+            .clone()
+            .unwrap_or_else(|| LocalizedString::new("app-name"));
+        title.resolve(&state.borrow().data, &state.borrow().env);
 
+        let mut menu = self.menu.to_owned();
+        let platform_menu = menu
+            .as_mut()
+            .map(|m| m.build_window_menu(&state.borrow().data, &state.borrow().env));
+
+        let handler = DruidHandler::new_shared(state.clone(), self.id);
+
+        let mut builder = WindowBuilder::new();
+        builder.set_handler(Box::new(handler));
+        if let Some(size) = self.size {
+            builder.set_size(size);
+        }
+        builder.set_title(title.localized_str());
+        if let Some(menu) = platform_menu {
+            builder.set_menu(menu);
+        }
+
+        let root = (self.root_builder)();
+        state
+            .borrow_mut()
+            .add_window(self.id, Window::new(root, title, menu));
+
+        builder.attach(parent)
+
+    }
+    
     /// Set the menu for this window.
     pub fn menu(mut self, menu: MenuDesc<T>) -> Self {
         self.menu = Some(menu);
