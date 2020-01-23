@@ -813,17 +813,20 @@ impl WindowBuilder {
         unsafe {
             // Maybe separate registration in build api? Probably only need to
             // register once even for multiple window creation.
-
+            /// Some class name? OsStr reencoded as a wide character sequence, i.e. UTF-16
             let class_name = super::util::CLASS_NAME.to_wide();
+            /// like IDWriteFactory. Creates Direct Write objects, for drawing texts
             let dwrite_factory = directwrite::Factory::new().unwrap();
+            /// Not sure why a clone is necessary
             let dw_clone = clone_dwrite(&dwrite_factory);
+            /// Information for the window creation entry-point
             let wndproc = MyWndProc {
                 handle: Default::default(),
                 d2d_factory: direct2d::Factory::new().unwrap(),
                 dwrite_factory: dw_clone,
                 state: RefCell::new(None),
             };
-
+            /// 
             let window = WindowState {
                 hwnd: Cell::new(0 as HWND),
                 dpi: Cell::new(0.0),
@@ -894,6 +897,52 @@ impl WindowBuilder {
             mem::drop(win);
             Ok(handle)
         }
+    }
+    /// Create a view (not an actual platform window) and attach to a parent view.
+    ///
+    /// This method is useful when embedding into an existing app, or writing a VST
+    /// plug-in. It is unsafe because the parent_view handle must be valid.
+    ///
+    /// On macOS, the parent_view is an NSView object.
+    
+    // On Windows the parent_view is this instead:
+    //In Windows, that parent pointer is really a winapi::HWND__. 
+    //You can convert the parent pointer by doing parent as *mut winapi::HWND__,
+    // and connecting to the window through CreateWindowExW.
+    ///
+    pub unsafe fn attach(self, parent_view: *mut winapi::shared::windef::HWND__) -> Result<WindowHandle, Error> {
+        // Not sure if it's really a good idea to take stuff from build
+        let dwrite_factory = directwrite::Factory::new().unwrap();
+        /// Not sure why a clone is necessary
+        let dw_clone = clone_dwrite(&dwrite_factory);
+        let wndproc = MyWndProc {
+            handle: Default::default(),
+            d2d_factory: direct2d::Factory::new().unwrap(),
+            dwrite_factory: dw_clone,
+            state: RefCell::new(None),
+        };
+
+        let window = WindowState {
+            // Should this be parent_view or 0 as hwnd?
+            hwnd: Cell::new(parent_view),
+            dpi: Cell::new(0.0),
+            wndproc: Box::new(wndproc),
+            idle_queue: Default::default(),
+            timers: Arc::new(Mutex::new(TimerSlots::new(1))),
+        };
+        
+        // Maybe windows' analogy to NSView::frame is the create_window() function??
+
+        // let frame = NSView::frame(parent_view);
+        // view.initWithFrame_(frame);
+        // Do we need the framesize on windows and if so, what should it be?
+        // let () = msg_send!(view, setFrameSize: frame.size);
+        // parent_view.addSubview_(view);
+        let win = Rc::new(window);
+        Ok(WindowHandle {
+            dwrite_factory: Some(dwrite_factory),
+            state: Rc::downgrade(&win)
+        })
     }
 }
 
