@@ -55,6 +55,7 @@ pub struct WindowDesc<T> {
     /// This can be used to track a window from when it is launched and when
     /// it actually connects.
     pub id: WindowId,
+    // TODO(Fredemus): add a field for the parent window that the vst can set, to avoid void * shenanigans in Druid 
 }
 
 impl<T: Data> AppLauncher<T> {

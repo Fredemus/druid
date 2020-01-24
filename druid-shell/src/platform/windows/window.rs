@@ -811,22 +811,15 @@ impl WindowBuilder {
 
     pub fn build(self) -> Result<WindowHandle, Error> {
         unsafe {
-            // Maybe separate registration in build api? Probably only need to
-            // register once even for multiple window creation.
-            /// Some class name? OsStr reencoded as a wide character sequence, i.e. UTF-16
             let class_name = super::util::CLASS_NAME.to_wide();
-            /// like IDWriteFactory. Creates Direct Write objects, for drawing texts
             let dwrite_factory = directwrite::Factory::new().unwrap();
-            /// Not sure why a clone is necessary
             let dw_clone = clone_dwrite(&dwrite_factory);
-            /// Information for the window creation entry-point
             let wndproc = MyWndProc {
                 handle: Default::default(),
                 d2d_factory: direct2d::Factory::new().unwrap(),
                 dwrite_factory: dw_clone,
                 state: RefCell::new(None),
             };
-            /// 
             let window = WindowState {
                 hwnd: Cell::new(0 as HWND),
                 dpi: Cell::new(0.0),
@@ -911,11 +904,12 @@ impl WindowBuilder {
     // and connecting to the window through CreateWindowExW.
     ///
     pub unsafe fn attach(self, parent: *mut c_void) -> Result<WindowHandle, Error> {
-
-        // let parent_view = winapi::shared::windef::HWND::from(parent);
+        // FIXME: this conversion is unsafe. People want this to happen in the vst, not in druid
         let parent_view = std::mem::transmute::<*mut c_void, winapi::shared::windef::HWND>(parent);
-        // let parentview = parent as winapi::shared::windef::HWND__;
-
+        // parameters taken from https://github.com/wrl/rutabaga/blob/master/src/platform/win/window.c#L351-L361
+        // create_window(0, lpClassName: LPCWSTR, lpWindowName: LPCWSTR, dwStyle: DWORD, x: c_int, y: c_int, nWidth: c_int, nHeight: c_int, hWndParent: HWND, hMenu: HMENU, hInstance: HINSTANCE, wndproc: Rc<WindowState>);
+        
+        let class_name = super::util::CLASS_NAME.to_wide();
         // Not sure if it's really a good idea to take stuff from build
         let dwrite_factory = directwrite::Factory::new().unwrap();
         /// Not sure why a clone is necessary
@@ -928,26 +922,64 @@ impl WindowBuilder {
         };
 
         let window = WindowState {
-            // Should this be parent_view or 0 as hwnd?
-            hwnd: Cell::new(parent_view),
+            // FIXME(Fredemus): Should this be parent_view or 0 as hwnd?
+            hwnd: Cell::new(parent_view), 
             dpi: Cell::new(0.0),
             wndproc: Box::new(wndproc),
             idle_queue: Default::default(),
             timers: Arc::new(Mutex::new(TimerSlots::new(1))),
         };
+        let win = Rc::new(window);
+            let handle = WindowHandle {
+                dwrite_factory: Some(dwrite_factory),
+                state: Rc::downgrade(&win),
+            };
         
-        // Maybe windows' analogy to NSView::frame is the create_window() function??
+        // Simple scaling based on System Dpi (96 is equivalent to 100%)
+        let dpi = if let Some(func) = OPTIONAL_FUNCTIONS.GetDpiForSystem {
+            // Only supported on windows 10
+            func() as f32
+        } else {
+            // TODO GetDpiForMonitor is supported on windows 8.1, try falling back to that here
+            // Probably GetDeviceCaps(..., LOGPIXELSX) is the best to do pre-10
+            96.0
+        };
+        
+        win.dpi.set(dpi);
+        let width = (self.size.width * (f64::from(dpi) / 96.0)) as i32;
+        let height = (self.size.height * (f64::from(dpi) / 96.0)) as i32;
 
+        let hmenu = match self.menu {
+            Some(menu) => menu.into_hmenu(),
+            None => 0 as HMENU,
+        };
+        let mut dwExStyle = 0;
+        if self.present_strategy == PresentStrategy::Flip {
+            dwExStyle |= WS_EX_NOREDIRECTIONBITMAP;
+        }
+        let hwnd = create_window(
+            dwExStyle,
+            class_name.as_ptr(),
+            self.title.to_wide().as_ptr(),
+            self.dwStyle,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            width,
+            height,
+            parent_view,
+            hmenu,
+            0 as HINSTANCE,
+            win.clone(),
+        );
+        if hwnd.is_null() {
+            return Err(Error::NullHwnd);
+        }
         // let frame = NSView::frame(parent_view);
         // view.initWithFrame_(frame);
         // Do we need the framesize on windows and if so, what should it be?
         // let () = msg_send!(view, setFrameSize: frame.size);
         // parent_view.addSubview_(view);
-        let win = Rc::new(window);
-        Ok(WindowHandle {
-            dwrite_factory: Some(dwrite_factory),
-            state: Rc::downgrade(&win)
-        })
+        Ok(handle)
     }
 }
 
