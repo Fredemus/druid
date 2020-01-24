@@ -115,7 +115,11 @@ impl<T: Data> AppLauncher<T> {
         main_loop.run();
         Ok(())
     }
-    /// Same as launch, but for attaching the window to a parent window
+    /// Attach the windows to a parent window and start the runloop.
+    ///
+    /// Returns an error if a window cannot be instantiated. This is usually
+    /// a fatal error.
+    /// Seemed to be necessary since making attach_native public leaked a crate-visible type 
     pub fn launch_vst(mut self, data: T, parent: *mut c_void) -> Result<(), PlatformError> {
         Application::init();
         let mut main_loop = RunLoop::new();
@@ -214,7 +218,7 @@ impl<T: Data> WindowDesc<T> {
 
         builder.build()
     }
-    // TODO: figure out what the hell to have in here
+    // FIXME(Fredemus): merge this together with build_native for dedup
     pub(crate) fn attach_native(
         &self,
         state: &Rc<RefCell<AppState<T>>>,
