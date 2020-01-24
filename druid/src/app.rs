@@ -141,7 +141,7 @@ impl<T: Data> AppLauncher<T> {
 }
 
 impl<T: Data> WindowDesc<T> {
-    /// Create a new `WindowDesc`, taking a funciton that will generate the root
+    /// Create a new `WindowDesc`, taking a function that will generate the root
     /// [`Widget`] for this window.
     ///
     /// It is possible that a `WindowDesc` can be reused to launch multiple windows.
@@ -217,6 +217,17 @@ impl<T: Data> WindowDesc<T> {
             .add_window(self.id, Window::new(root, title, menu));
 
         builder.build()
+    }
+    /// needed to tel a vst the size of the window
+    pub fn get_size(&self) -> (i32, i32) {
+        if self.size != None {
+            let size = self.size.unwrap();
+            size.round();
+            return (size.width as i32, size.height as i32);
+        }
+        else {
+            return (0,0);
+        }
     }
     // FIXME(Fredemus): merge this together with build_native for dedup
     pub(crate) fn attach_native(
