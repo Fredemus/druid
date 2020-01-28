@@ -974,11 +974,22 @@ impl WindowBuilder {
         if hwnd.is_null() {
             return Err(Error::NullHwnd);
         }
-        // let frame = NSView::frame(parent_view);
-        // view.initWithFrame_(frame);
-        // Do we need the framesize on windows and if so, what should it be?
-        // let () = msg_send!(view, setFrameSize: frame.size);
-        // parent_view.addSubview_(view);
+        let dcomp_state = create_dcomp_state(self.present_strategy, hwnd).unwrap_or_else(|e| {
+            warn!("Creating swapchain failed, falling back to hwnd: {:?}", e);
+            None
+        });
+
+        win.hwnd.set(hwnd);
+        let state = WndState {
+            handler: self.handler.unwrap(),
+            render_target: None,
+            dcomp_state,
+            dpi,
+            stashed_key_code: KeyCode::Unknown(0),
+            stashed_char: None,
+        };
+        win.wndproc.connect(&handle, state);
+        mem::drop(win);
         Ok(handle)
     }
 }
