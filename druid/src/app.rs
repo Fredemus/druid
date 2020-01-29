@@ -135,7 +135,7 @@ impl<T: Data> AppLauncher<T> {
             window.show();
         }
 
-        main_loop.run();
+        // main_loop.run();
         Ok(())
     }
 }
