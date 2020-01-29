@@ -121,8 +121,8 @@ impl<T: Data> AppLauncher<T> {
     /// a fatal error.
     /// Seemed to be necessary since making attach_native public leaked a crate-visible type 
     pub fn launch_vst(mut self, data: T, parent: *mut c_void) -> Result<(), PlatformError> {
-        Application::init();
-        let mut main_loop = RunLoop::new();
+        // Application::init();
+        // let mut main_loop = RunLoop::new();
         let mut env = theme::init();
         if let Some(f) = self.env_setup.take() {
             f(&mut env, &data);
@@ -241,10 +241,10 @@ impl<T: Data> WindowDesc<T> {
             .unwrap_or_else(|| LocalizedString::new("app-name"));
         title.resolve(&state.borrow().data, &state.borrow().env);
 
-        let mut menu = self.menu.to_owned();
-        let platform_menu = menu
-            .as_mut()
-            .map(|m| m.build_window_menu(&state.borrow().data, &state.borrow().env));
+        // let mut menu = self.menu.to_owned();
+        // let platform_menu = menu
+        //     .as_mut()
+        //     .map(|m| m.build_window_menu(&state.borrow().data, &state.borrow().env));
 
         let handler = DruidHandler::new_shared(state.clone(), self.id);
 
@@ -254,14 +254,14 @@ impl<T: Data> WindowDesc<T> {
             builder.set_size(size);
         }
         builder.set_title(title.localized_str());
-        if let Some(menu) = platform_menu {
-            builder.set_menu(menu);
-        }
+        // if let Some(menu) = platform_menu {
+        //     builder.set_menu(menu);
+        // }
 
         let root = (self.root_builder)();
         state
             .borrow_mut()
-            .add_window(self.id, Window::new(root, title, menu));
+            .add_window(self.id, Window::new(root, title, None));
 
         builder.attach(parent)
 
