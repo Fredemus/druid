@@ -121,7 +121,7 @@ impl<T: Data> AppLauncher<T> {
     /// a fatal error.
     /// Seemed to be necessary since making build_native_attach public leaked a crate-visible type 
     pub fn attach_and_launch(mut self, data: T, parent: *mut c_void) -> Result<(), PlatformError> {
-        // Application::init();
+        Application::init();
         // let mut main_loop = RunLoop::new();
         let mut env = theme::init();
         if let Some(f) = self.env_setup.take() {
