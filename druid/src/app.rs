@@ -119,8 +119,8 @@ impl<T: Data> AppLauncher<T> {
     ///
     /// Returns an error if a window cannot be instantiated. This is usually
     /// a fatal error.
-    /// Seemed to be necessary since making attach_native public leaked a crate-visible type 
-    pub fn launch_vst(mut self, data: T, parent: *mut c_void) -> Result<(), PlatformError> {
+    /// Seemed to be necessary since making build_native_attach public leaked a crate-visible type 
+    pub fn attach_and_launch(mut self, data: T, parent: *mut c_void) -> Result<(), PlatformError> {
         // Application::init();
         // let mut main_loop = RunLoop::new();
         let mut env = theme::init();
@@ -131,7 +131,7 @@ impl<T: Data> AppLauncher<T> {
         let state = AppState::new(data, env, self.delegate.take());
 
         for desc in self.windows {
-            let window = desc.attach_native(&state, parent)?;
+            let window = desc.build_native_attach(&state, parent)?;
             window.show();
         }
 
@@ -214,7 +214,7 @@ impl<T: Data> WindowDesc<T> {
         let root = (self.root_builder)();
         state
             .borrow_mut()
-            .add_window(self.id, Window::new(root, title, menu));
+            .add_window(self.id, Window::new(root, Some(title), menu));
 
         builder.build()
     }
@@ -230,22 +230,11 @@ impl<T: Data> WindowDesc<T> {
         }
     }
     // FIXME(Fredemus): merge this together with build_native for dedup
-    pub(crate) fn attach_native(
+    pub(crate) fn build_native_attach(
         &self,
         state: &Rc<RefCell<AppState<T>>>,
         parent: *mut c_void
     ) -> Result<WindowHandle, PlatformError> {
-        let mut title = self
-            .title
-            .clone()
-            .unwrap_or_else(|| LocalizedString::new("app-name"));
-        title.resolve(&state.borrow().data, &state.borrow().env);
-
-        // let mut menu = self.menu.to_owned();
-        // let platform_menu = menu
-        //     .as_mut()
-        //     .map(|m| m.build_window_menu(&state.borrow().data, &state.borrow().env));
-
         let handler = DruidHandler::new_shared(state.clone(), self.id);
 
         let mut builder = WindowBuilder::new();
@@ -253,18 +242,13 @@ impl<T: Data> WindowDesc<T> {
         if let Some(size) = self.size {
             builder.set_size(size);
         }
-        builder.set_title(title.localized_str());
-        // if let Some(menu) = platform_menu {
-        //     builder.set_menu(menu);
-        // }
 
         let root = (self.root_builder)();
         state
             .borrow_mut()
-            .add_window(self.id, Window::new(root, title, None));
+            .add_window(self.id, Window::new(root, None, None));
 
         builder.attach(parent)
-
     }
     
     /// Set the menu for this window.
